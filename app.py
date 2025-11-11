@@ -1,41 +1,68 @@
 import streamlit as st
 import pandas as pd
 import pickle
+import numpy as np
 
-# === Load model, scaler, and encoders ===
-model = pickle.load(open("churn_model.pkl", "rb"))
-scaler = pickle.load(open("scaler.pkl", "rb"))
-encoders = pickle.load(open("encoders.pkl", "rb"))
+# -------------------------------
+# Load trained model, scaler, and encoders
+# -------------------------------
+with open("churn_model.pkl", "rb") as f:
+    model = pickle.load(f)
 
-st.title("📊 Customer Churn Prediction Dashboard")
-st.markdown("Predict if a customer will churn based on input features.")
+with open("scaler.pkl", "rb") as f:
+    scaler = pickle.load(f)
 
-# === Create input fields dynamically ===
+with open("encoders.pkl", "rb") as f:
+    encoders = pickle.load(f)
+
+st.set_page_config(page_title="Customer Churn Dashboard", layout="wide")
+st.title("📊 Telecom Customer Churn Prediction Dashboard")
+
+# -------------------------------
+# Create input fields for categorical features
+# -------------------------------
 inputs = {}
-for col, enc in encoders.items():
-    options = enc.classes_
-    inputs[col] = st.selectbox(f"{col}", options)
 
-# For numeric columns (you can adjust these manually)
-numeric_cols = [col for col in model.feature_names_in_ if col not in encoders]
+st.sidebar.header("Customer Inputs")
+
+for col, le in encoders.items():
+    inputs[col] = st.sidebar.selectbox(f"{col}", le.classes_)
+
+# -------------------------------
+# Create input fields for numeric features
+# -------------------------------
+# Numeric columns = everything in the dataset that is NOT in encoders
+# We save numeric column names in encoders dict for simplicity
+# (you can adjust if you know which ones are numeric)
+all_features = pickle.load(open("encoders.pkl", "rb"))
+numeric_cols = [col for col in model.feature_names_in_ if col not in encoders] \
+    if hasattr(model, 'feature_names_in_') else []  # fallback empty
+
+# Optional: Let’s assume numeric columns are the rest (you can list manually)
+# For example, if your CSV has these numeric columns:
+numeric_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']  # <- adjust according to your dataset
+
 for col in numeric_cols:
-    inputs[col] = st.number_input(f"{col}", value=0.0)
+    inputs[col] = st.sidebar.number_input(f"{col}", value=0.0)
 
-# === Predict button ===
+# -------------------------------
+# Predict button
+# -------------------------------
 if st.button("Predict Churn"):
-    # Convert categorical to encoded
-    for col, enc in encoders.items():
-        inputs[col] = enc.transform([inputs[col]])[0]
+    # Encode categorical inputs
+    for col, le in encoders.items():
+        inputs[col] = le.transform([inputs[col]])[0]
 
-    # Create dataframe
-    X = pd.DataFrame([inputs])
+    # Create DataFrame for prediction
+    X_new = pd.DataFrame([inputs])
 
     # Scale numeric features
-    X_scaled = scaler.transform(X)
+    X_new[numeric_cols] = scaler.transform(X_new[numeric_cols])
 
     # Predict
-    prediction = model.predict(X_scaled)[0]
-    prob = model.predict_proba(X_scaled)[0][1]
+    pred = model.predict(X_new)[0]
+    prob = model.predict_proba(X_new)[0][1]
 
-    st.write("### 🧠 Prediction:", "Churn" if prediction == 1 else "No Churn")
+    st.subheader("### 🧠 Prediction Result")
+    st.write("Churn" if pred == 1 else "No Churn")
     st.write(f"### 🔢 Confidence: {prob:.2%}")
