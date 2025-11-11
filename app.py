@@ -1,62 +1,40 @@
 import streamlit as st
 import pandas as pd
 import pickle
-import numpy as np
-
-# -------------------------------
-# Load trained model, scaler, and encoders
-# -------------------------------
-with open("churn_model.pkl", "rb") as f:
-    model = pickle.load(f)
-
-with open("scaler.pkl", "rb") as f:
-    scaler = pickle.load(f)
-
-with open("encoders.pkl", "rb") as f:
-    encoders = pickle.load(f)
 
 st.set_page_config(page_title="Customer Churn Dashboard", layout="wide")
 st.title("📊 Telecom Customer Churn Prediction Dashboard")
 
-# -------------------------------
-# Create input fields for categorical features
-# -------------------------------
+# === Load model & helpers ===
+model = pickle.load(open("churn_model.pkl", "rb"))
+scaler = pickle.load(open("scaler.pkl", "rb"))
+encoders = pickle.load(open("encoders.pkl", "rb"))
+numeric_cols = pickle.load(open("numeric_cols.pkl", "rb"))
+training_columns = pickle.load(open("training_columns.pkl", "rb"))
+
+# === Sidebar inputs ===
+st.sidebar.header("Customer Inputs")
 inputs = {}
 
-st.sidebar.header("Customer Inputs")
-
+# Categorical inputs
 for col, le in encoders.items():
     inputs[col] = st.sidebar.selectbox(f"{col}", le.classes_)
 
-# -------------------------------
-# Create input fields for numeric features
-# -------------------------------
-# Numeric columns = everything in the dataset that is NOT in encoders
-# We save numeric column names in encoders dict for simplicity
-# (you can adjust if you know which ones are numeric)
-all_features = pickle.load(open("encoders.pkl", "rb"))
-numeric_cols = [col for col in model.feature_names_in_ if col not in encoders] \
-    if hasattr(model, 'feature_names_in_') else []  # fallback empty
-
-# Optional: Let’s assume numeric columns are the rest (you can list manually)
-# For example, if your CSV has these numeric columns:
-numeric_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']  # <- adjust according to your dataset
-
+# Numeric inputs
 for col in numeric_cols:
     inputs[col] = st.sidebar.number_input(f"{col}", value=0.0)
 
-# -------------------------------
-# Predict button
-# -------------------------------
+# === Predict button ===
 if st.button("Predict Churn"):
-    # Encode categorical inputs
+    # Encode categorical features
     for col, le in encoders.items():
         inputs[col] = le.transform([inputs[col]])[0]
 
-    # Create DataFrame for prediction
+    # Create DataFrame with correct column order
     X_new = pd.DataFrame([inputs])
+    X_new = X_new.reindex(columns=training_columns)
 
-    # Scale numeric features
+    # Scale numeric columns
     X_new[numeric_cols] = scaler.transform(X_new[numeric_cols])
 
     # Predict
