@@ -2,11 +2,9 @@ name: Print Hello World
 
 on:
   push:
-    branches:
-      - main
 
 jobs:
-  hello-world:
+  say-hello:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,3 +13,11 @@ jobs:
 
       - name: Print Hello World
         run: echo "Hello World"
+
+  second-job:
+    runs-on: ubuntu-latest
+    needs: say-hello   # 👈 runs AFTER say-hello finishes
+
+    steps:
+      - name: Print Second Job
+        run: echo "Second job executed after Hello World"
